@@ -3,15 +3,25 @@
 // headers. Keys live only in Worker env vars / secrets, never in this repo:
 //   KOIOS_TOKEN            optional Koios bearer token
 //   BLOCKFROST_PREPROD / BLOCKFROST_PREVIEW / BLOCKFROST_MAINNET  optional failover project ids
-//   ALLOWED_ORIGINS        comma-separated origins, e.g. "https://kshot3000.github.io,https://localhost"
+//   ALLOWED_ORIGINS        comma-separated origins allowed to read (CORS). Empty or
+//                          unset means NO browser origin is allowed.
 // Route: GET /{mainnet|preprod|preview}/api/v1/tx_info?_tx_hashes={<64 hex>}&_inputs=true&_metadata=true
 const KOIOS = { mainnet: 'https://api.koios.rest/api/v1', preprod: 'https://preprod.koios.rest/api/v1', preview: 'https://preview.koios.rest/api/v1' };
 
+export function allowedOrigins(env) {
+  return (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
+}
+
+/** CORS headers: only exact origins from ALLOWED_ORIGINS; empty list denies every browser origin. */
 function cors(req, env) {
   const origin = req.headers.get('origin') || '';
-  const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const ok = !allowed.length || allowed.includes(origin);
-  return { 'access-control-allow-origin': ok ? origin || '*' : 'null', 'access-control-allow-methods': 'GET, OPTIONS', 'access-control-allow-headers': 'accept, content-type', vary: 'origin' };
+  const h = { vary: 'origin' };
+  if (origin && allowedOrigins(env).includes(origin)) {
+    h['access-control-allow-origin'] = origin;
+    h['access-control-allow-methods'] = 'GET, OPTIONS';
+    h['access-control-allow-headers'] = 'accept, content-type';
+  }
+  return h;
 }
 const json = (body, status, headers) => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json', 'cache-control': 'public, max-age=30', ...headers } });
 
@@ -33,6 +43,13 @@ function chunkArrayToHex(hex) {
   return out;
 }
 
+// Only inputs the tx actually spends prove who signed it. Reference and
+// collateral inputs can point at anyone's UTxO, so including them would let a
+// forger pass off a stamp as "issued by" a school whose UTxO they referenced.
+export function spendingInputs(utxos) {
+  return (utxos?.inputs || []).filter((i) => i && !i.reference && !i.collateral && i.address);
+}
+
 async function blockfrost(network, hash, env) {
   const id = env[`BLOCKFROST_${network.toUpperCase()}`];
   if (!id) return null;
@@ -45,12 +62,14 @@ async function blockfrost(network, hash, env) {
   for (const m of md || []) {
     if (m.label === '309') metadata['309'] = chunkArrayToHex(m.metadata || m.cbor_metadata?.replace(/^\\x/, '').slice(0) || '');
   }
-  return [{ tx_hash: hash, block_height: tx.block_height, tx_timestamp: tx.block_time, metadata, inputs: (utxos?.inputs || []).map((i) => ({ payment_addr: { bech32: i.address, cred: null } })) }];
+  return [{ tx_hash: hash, block_height: tx.block_height, tx_timestamp: tx.block_time, metadata, inputs: spendingInputs(utxos).map((i) => ({ payment_addr: { bech32: i.address, cred: null } })) }];
 }
 
 export default {
   async fetch(req, env) {
     const h = cors(req, env);
+    const origin = req.headers.get('origin');
+    if (origin && !h['access-control-allow-origin']) return json({ error: 'Origin not allowed' }, 403, h);
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: h });
     if (req.method !== 'GET') return json({ error: 'GET only' }, 405, h);
     const url = new URL(req.url);

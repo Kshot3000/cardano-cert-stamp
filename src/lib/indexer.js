@@ -1,16 +1,13 @@
 // Read-only chain lookups. No API key is ever shipped in this code.
 //
 // Sources, tried in order:
-//  1. A Worker proxy, if config.js sets one (see worker/). It holds any Koios
-//     or Blockfrost key in Cloudflare env vars and adds CORS headers.
-//  2. Koios directly. Works from Node, from the Android app (Capacitor's
-//     native HTTP isn't subject to browser CORS) and from any browser once
-//     Koios sends CORS headers. Koios's no-key public tier currently leaves
-//     Access-Control-Allow-Origin off responses, so browsers block it.
-//  3. Optional public CORS relay (proxy.cors.dev). It only sees a public tx
-//     hash, but a relay could in theory lie, so the UI always says which source
-//     answered and links the tx on an explorer for an independent check.
-//     Disable it with config.allowPublicRelay = false.
+//  1. The Worker proxy set in config.js (see worker/). This is the only path
+//     that works from a normal browser page: it adds CORS headers and keeps
+//     any Koios/Blockfrost key in Cloudflare secrets.
+//  2. Koios directly. Works from Node scripts and from the Android app
+//     (Capacitor's native HTTP isn't subject to browser CORS). Browsers block
+//     it, because Koios's keyless tier omits Access-Control-Allow-Origin.
+// There is deliberately no third-party CORS relay: a relay could forge results.
 export const KOIOS = {
   mainnet: 'https://api.koios.rest/api/v1',
   preprod: 'https://preprod.koios.rest/api/v1',
@@ -21,17 +18,14 @@ export const EXPLORER = {
   preprod: 'https://preprod.cardanoscan.io/transaction/',
   preview: 'https://preview.cardanoscan.io/transaction/',
 };
-export const PUBLIC_RELAY = 'https://proxy.cors.dev/';
-
 const txInfoPath = (txHash) => `/tx_info?_tx_hashes=%7B${txHash}%7D&_inputs=true&_metadata=true`;
 
-export function sourcesFor(network, { workerBase = '', allowPublicRelay = true, koios = KOIOS } = {}) {
+export function sourcesFor(network, { workerBase = '', koios = KOIOS } = {}) {
   const k = koios[network];
   if (!k) throw new Error('Unknown network: use mainnet, preprod or preview');
   const list = [];
   if (workerBase) list.push({ source: 'Worker proxy', base: `${workerBase.replace(/\/$/, '')}/${network}/api/v1` });
   list.push({ source: 'Koios', base: k });
-  if (allowPublicRelay) list.push({ source: `Koios via ${new URL(PUBLIC_RELAY).host}`, base: PUBLIC_RELAY + k });
   return list;
 }
 

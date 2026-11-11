@@ -60,8 +60,12 @@ holds each certificate's salt. Without it, lost QR codes can't be reissued.
   paste a link. It needs no wallet or account and reads the network from the
   link. If the certificate is bound to a PDF, it can check the file too.
 * **Issuer check:** the page shows whether the wallet that signed the stamp is
-  in our curated `public/issuers.json` registry (empty for now), or matches the
-  issuer wallet printed on the certificate, or doesn't match.
+  in our curated `public/issuers.json` registry (empty for now; entries can be
+  `mainnet`, `preprod` or `preview`, and an entry whose address doesn't match
+  its network is ignored). Only spending inputs count as signers: reference
+  and collateral inputs are ignored, so nobody can borrow a school's UTxO to
+  fake "issued by". It also shows whether the signer matches the issuer wallet
+  printed on the certificate.
 * **Android:** the same static build wrapped with Capacitor (`android/`). The
   verifier and QR scanning work in the app. Stamping needs a desktop browser
   wallet.
@@ -71,19 +75,22 @@ delivery, analytics.
 
 ## Chain reads and CORS
 
-The verify page reads one transaction through [Koios](https://koios.rest) with
-no API key. Koios's keyless tier doesn't currently send the
-`Access-Control-Allow-Origin` header to browsers (tested Nov 10, 2026), so the
-page tries, in order:
+The verify page reads one transaction through [Koios](https://koios.rest).
+Koios's keyless tier doesn't send the `Access-Control-Allow-Origin` header to
+browsers (tested Nov 10, 2026), so the page tries, in order:
 
-1. a Worker proxy, if `workerBase` is set in `src/config.js` (see
-   [worker/README.md](worker/README.md); keys come from Worker secrets and are
-   never committed),
-2. Koios directly. This works in the Android app, since native HTTP has no CORS limit,
-3. the public CORS relay `proxy.cors.dev`, which only ever sees the public tx
-   hash. A relay could in theory lie, so the page always says which source
-   answered and links the transaction on Cardanoscan for an independent check.
-   Set `allowPublicRelay: false` to turn it off once the Worker is live.
+1. **the Worker proxy** set as `workerBase` in `src/config.js` (see
+   [worker/README.md](worker/README.md)). This is the **only path for normal
+   browsers**. Keys come from Worker secrets and are never committed, and the
+   Worker answers only the origins in `ALLOWED_ORIGINS` (empty means deny all).
+2. **Koios directly.** This works in the Android app (native HTTP has no CORS
+   limit) and in Node scripts.
+
+There is deliberately no third-party CORS relay, since a relay could forge
+results. Until the Worker is deployed, the verify page in a desktop or mobile
+browser shows "Couldn't check right now". Every result (valid, does not match,
+not found, error) always links the stamp transaction on Cardanoscan for the
+right network, so anyone can check independently of our Worker.
 
 Stamping needs no indexer at all: UTxOs come from the wallet, the fee uses
 Mesh's built-in protocol parameters, and the wallet submits the transaction.
@@ -115,7 +122,7 @@ npx vite preview --port 4173 & node scripts/e2e-verify.mjs   # headless-Chrome v
 ```
 
 Configuration lives in `src/config.js`: default network, `workerBase`,
-`allowPublicRelay`, the public verify URL used for QR codes, and the tip button
+the public verify URL used for QR codes, and the tip button
 (`TIP_ENABLED`). It holds no secrets.
 
 ### GitHub Pages
@@ -140,7 +147,7 @@ and the manifest requests the camera for QR scanning.
 
 ## Testing status
 
-* ✅ 85 unit tests pass, including the official CIP-190 conformance vectors
+* ✅ 92 unit tests pass, including the official CIP-190 conformance vectors
   (canonical CBOR, RFC 9162 roots and inclusion proofs, label-309 chunk
   reassembly; vectors in `test/vectors/`, Apache-2.0, from
   [cardanowall/label-309](https://github.com/cardanowall/label-309)).
@@ -148,9 +155,10 @@ and the manifest requests the camera for QR scanning.
   Chrome) and carries the expected label 309 and 674 metadata. The fee comes
   to about 0.17–0.2 ADA.
 * ✅ The verify page, tested in headless Chrome on a phone-sized screen,
-  correctly rejects a real Preprod transaction that isn't a stamp (read live
-  through the fallback chain). It accepts a simulated stamped batch, rejects an
-  edited certificate, and decodes an uploaded QR photo.
+  accepts a simulated stamped batch, rejects an edited certificate, and
+  decodes an uploaded QR photo. With no Worker configured, it shows "Couldn't
+  check" for a real Preprod lookup (no relay fallback). Every result shows the
+  Cardanoscan link for the right network.
 * ⏳ **Not yet done:** a real stamp on Preprod signed by a real wallet, then a
   phone scan of the printed QR. That needs a browser wallet with free test ADA.
   Mainnet stays untested until then.

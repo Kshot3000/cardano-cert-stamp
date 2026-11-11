@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { verifyCertificate } from '../src/lib/verify.js';
+import { verifyCertificate, validIssuers } from '../src/lib/verify.js';
 import { prepareBatch } from '../src/lib/batch.js';
 import { fetchTx, normalizeTxInfo, sourcesFor } from '../src/lib/indexer.js';
 import { toHex } from '../src/lib/hash.js';
@@ -25,6 +25,23 @@ describe('verifyCertificate', () => {
     expect(r.issuer).toBe('printed');
     expect(r.batchSize).toBe(5);
     expect(r.explorerUrl).toBe('https://preprod.cardanoscan.io/transaction/' + TX);
+  });
+  it('registry accepts mainnet entries and ignores entries whose address does not match their network', async () => {
+    const MAIN = 'addr1qx2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3n0d3vllmyqwsx5wktcd8cc3sq835lu7drv2xwl2wywfgse35a3x';
+    const list = [
+      { name: 'Main School', network: 'mainnet', address: MAIN },
+      { name: 'Wrong Net', network: 'mainnet', address: ADDR },
+      { name: 'Bad', network: 'sanchonet', address: ADDR },
+      { name: '', network: 'preprod', address: ADDR },
+    ];
+    expect(validIssuers(list).map((r) => r.name)).toEqual(['Main School']);
+    const { b, row } = await setup();
+    const mainRow = { ...row, inputs: [{ payment_addr: { bech32: MAIN, cred: '9493315cd92eb5d8c4304e67b7e16ae36d61d34502694657811a2c8e' } }] };
+    const r = await verifyCertificate({ ...linkOf(b.entries[0]), network: 'mainnet', fields: { ...b.entries[0].fields } }, { fetchTx: async () => ({ source: 's', tx: normalizeTxInfo(mainRow) }), issuers: list });
+    expect(r.status).toBe('valid');
+    expect(r.issuer).toBe('registry');
+    expect(r.registryEntry.name).toBe('Main School');
+    expect(r.explorerUrl).toBe('https://cardanoscan.io/transaction/' + TX);
   });
   it('registry issuer wins when the signer is listed in issuers.json', async () => {
     const { b, stub } = await setup();
@@ -60,21 +77,49 @@ describe('verifyCertificate', () => {
 });
 
 describe('indexer sources', () => {
-  it('worker first, then Koios, then the public relay; relay can be disabled', () => {
-    expect(sourcesFor('preprod', { workerBase: 'https://w.example/' }).map((s) => s.source)).toEqual(['Worker proxy', 'Koios', 'Koios via proxy.cors.dev']);
-    expect(sourcesFor('preprod', { allowPublicRelay: false }).map((s) => s.source)).toEqual(['Koios']);
-    expect(sourcesFor('mainnet', { allowPublicRelay: false })[0].base).toBe('https://api.koios.rest/api/v1');
+  it('worker first, then Koios; never a third-party relay', () => {
+    expect(sourcesFor('preprod', { workerBase: 'https://w.example/' }).map((s) => s.source)).toEqual(['Worker proxy', 'Koios']);
+    expect(sourcesFor('preprod', { workerBase: 'https://w.example/' })[0].base).toBe('https://w.example/preprod/api/v1');
+    expect(sourcesFor('preprod').map((s) => s.source)).toEqual(['Koios']);
+    for (const n of ['mainnet', 'preprod', 'preview']) for (const s of sourcesFor(n, { workerBase: 'https://w.example' })) expect(s.base).not.toMatch(/cors|relay|allorigins|codetabs/);
+    expect(sourcesFor('mainnet')[0].base).toBe('https://api.koios.rest/api/v1');
     expect(() => sourcesFor('sanchonet')).toThrow();
   });
-  it('falls back when a source fails', async () => {
+  it('falls back from the Worker to Koios, then errors without trying anything else', async () => {
     const calls = [];
     const fetchImpl = async (url) => {
       calls.push(url);
-      if (!url.startsWith('https://proxy.cors.dev/')) throw new TypeError('Failed to fetch');
+      if (url.startsWith('https://w.example/')) throw new TypeError('Failed to fetch');
       return { ok: true, json: async () => [{ tx_hash: TX, inputs: [], metadata: null }] };
     };
-    const r = await fetchTx('preprod', TX, { fetchImpl });
-    expect(r.source).toBe('Koios via proxy.cors.dev');
-    expect(calls[0]).toBe(`https://preprod.koios.rest/api/v1/tx_info?_tx_hashes=%7B${TX}%7D&_inputs=true&_metadata=true`);
+    const r = await fetchTx('preprod', TX, { fetchImpl, workerBase: 'https://w.example' });
+    expect(r.source).toBe('Koios');
+    expect(calls).toEqual([
+      `https://w.example/preprod/api/v1/tx_info?_tx_hashes=%7B${TX}%7D&_inputs=true&_metadata=true`,
+      `https://preprod.koios.rest/api/v1/tx_info?_tx_hashes=%7B${TX}%7D&_inputs=true&_metadata=true`,
+    ]);
+    const seen = [];
+    await expect(fetchTx('preprod', TX, { fetchImpl: async (u) => { seen.push(u); throw new TypeError('Failed to fetch'); } })).rejects.toThrow('Could not reach');
+    expect(seen.length).toBe(1);
   });
+});
+
+describe('explorer link on every result', () => {
+  const EXPECT = { mainnet: 'https://cardanoscan.io/transaction/', preprod: 'https://preprod.cardanoscan.io/transaction/', preview: 'https://preview.cardanoscan.io/transaction/' };
+  for (const network of ['mainnet', 'preprod', 'preview']) {
+    it(`valid, mismatch, not_found and error all link the stamp tx on ${network} Cardanoscan`, async () => {
+      const { b, stub } = await setup(3);
+      const e = b.entries[1];
+      const l = { ...linkOf(e), network };
+      const cases = {
+        valid: await verifyCertificate(l, { fetchTx: stub() }),
+        mismatch: await verifyCertificate({ ...l, fields: { ...e.fields, course: 'Edited' } }, { fetchTx: stub() }),
+        invalid_input: await verifyCertificate({ ...l, salt: 'zz' }, { fetchTx: stub() }),
+        not_found: await verifyCertificate(l, { fetchTx: async () => ({ source: 's', tx: null }) }),
+        error: await verifyCertificate(l, { fetchTx: async () => { throw new Error('offline'); } }),
+      };
+      expect(Object.values(cases).map((r) => r.status)).toEqual(['valid', 'mismatch', 'mismatch', 'not_found', 'error']);
+      for (const r of Object.values(cases)) expect(r.explorerUrl).toBe(EXPECT[network] + TX);
+    });
+  }
 });

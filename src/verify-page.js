@@ -77,7 +77,8 @@ async function run(link) {
   $('#result').replaceChildren(h('div', { class: 'result' }, h('p', {}, 'Checking Cardano…')));
   try {
     await issuersReady;
-    const r = await verifyCertificate(link, { issuers, workerBase: CONFIG.workerBase, allowPublicRelay: CONFIG.allowPublicRelay });
+    const r = await verifyCertificate(link, { issuers, workerBase: CONFIG.workerBase });
+    if (r.status === 'error' && !CONFIG.workerBase) r.reason += ' (This site has no read proxy configured yet, so browsers cannot reach Koios. Use the Cardanoscan link below to check by hand.)';
     renderResult(link, r);
   } catch (e) {
     $('#result').replaceChildren(h('div', { class: 'result warn' }, h('h2', {}, "⚠️ Couldn't check right now"), h('p', {}, e.message || String(e))));

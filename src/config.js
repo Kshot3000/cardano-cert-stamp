@@ -5,12 +5,10 @@ export const CONFIG = {
   network: 'preprod',
   networks: ['preprod', 'preview', 'mainnet'],
 
-  // Optional read proxy (see worker/README.md). Leave '' to use Koios directly.
+  // Read proxy (see worker/README.md). Required for the verify page in normal
+  // browsers. The Android app and Node scripts can reach Koios directly.
   // Example: 'https://cert-stamp-proxy.<your-subdomain>.workers.dev'
   workerBase: '',
-
-  // Last-resort public CORS relay for Koios reads in browsers (see src/lib/indexer.js).
-  allowPublicRelay: true,
 
   // Where printed QR codes point. Used when the app runs somewhere without a
   // public URL (the Android app, localhost). On a public https host the

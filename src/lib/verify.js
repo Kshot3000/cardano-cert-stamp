@@ -3,7 +3,14 @@ import { certificateDigest } from './certificate.js';
 import { verifyInclusion } from './merkle.js';
 import { parseRecord } from './record.js';
 import { fetchTx, EXPLORER } from './indexer.js';
-import { paymentCredential } from './address.js';
+import { paymentCredential, addressMatchesNetwork } from './address.js';
+
+const REGISTRY_NETWORKS = ['mainnet', 'preprod', 'preview'];
+
+/** Keep only well-formed registry entries: a name, a known network, and an address valid for that network. */
+export function validIssuers(list) {
+  return (Array.isArray(list) ? list : []).filter((r) => r && typeof r.name === 'string' && r.name.trim() && REGISTRY_NETWORKS.includes(r.network) && addressMatchesNetwork(r.address, r.network));
+}
 
 /**
  * status:
@@ -35,7 +42,7 @@ export async function verifyCertificate(link, opts = {}) {
 
   const signers = [...new Set(tx.inputs.map((i) => i.address).filter(Boolean))];
   const signerCreds = new Set(tx.inputs.map((i) => i.cred || paymentCredential(i.address)).filter(Boolean));
-  const registry = opts.issuers || [];
+  const registry = validIssuers(opts.issuers);
   const reg = registry.find((r) => r.network === network && signerCreds.has(paymentCredential(r.address)));
   let issuer = 'unknown';
   if (reg) issuer = 'registry';

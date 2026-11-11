@@ -6,4 +6,5 @@ main = "index.js"
 compatibility_date = "2026-11-01"
 
 [vars]
-ALLOWED_ORIGINS = "https://kshot3000.github.io,https://localhost"
+# Exact origins allowed to read. Empty = deny all browser origins.
+ALLOWED_ORIGINS = "https://kshot3000.github.io,https://localhost,http://localhost,http://localhost:5173,http://localhost:4173"

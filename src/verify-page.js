@@ -5,6 +5,7 @@ import { $, h, testnetBanner, networkBanner, footer } from './ui-common.js';
 import { CONFIG } from './config.js';
 import { decodeFragment, looksLikeVerifyLink } from './lib/link.js';
 import { verifyCertificate } from './lib/verify.js';
+import { presentResult } from './lib/present.js';
 import { fileSha256 } from './lib/certificate.js';
 import { startScan, decodeImageFile } from './scan.js';
 
@@ -14,30 +15,16 @@ $('#footer').append(footer());
 let issuers = [];
 const issuersReady = fetch('./issuers.json').then((r) => r.json()).then((j) => (issuers = j.issuers || [])).catch(() => {});
 
-const LABELS = {
-  valid: ['✅', 'Valid certificate', 'ok'],
-  not_found: ['❔', 'Not found on Cardano', 'warn'],
-  mismatch: ['❌', 'Does not match', 'bad'],
-  error: ['⚠️', "Couldn't check right now", 'warn'],
-};
-
 function fmtTime(ts) {
   if (!ts) return null;
   return new Date(ts * 1000).toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
 }
 
-function issuerLine(r) {
-  if (r.issuer === 'registry') return h('p', { class: 'ok' }, `Issued by ${r.registryEntry.name} (wallet listed in our issuer registry).`);
-  if (r.issuer === 'printed') return h('p', {}, 'Stamped by the issuer wallet printed on this certificate. That wallet is not in our issuer registry yet, so confirm it with the issuer if it matters.');
-  if (r.issuer === 'no_match') return h('p', { class: 'bad' }, 'Warning: this stamp was signed by a different wallet than the one printed on the certificate.');
-  return h('p', {}, 'The issuer wallet is not in our registry. Ask the issuer which wallet they stamp from if you need to confirm who issued it.');
-}
-
 function renderResult(link, r) {
-  const [icon, title, cls] = LABELS[r.status];
+  const v = presentResult(r, link.fields);
   const f = link.fields;
-  const card = h('div', { class: `result ${cls}` },
-    h('h2', {}, `${icon} ${title}`),
+  const card = h('div', { class: `result ${v.tone}` },
+    h('h2', {}, `${v.icon} ${v.heading}`),
     r.status === 'valid' ? null : h('p', {}, r.reason),
     h('dl', {},
       h('dt', {}, 'Name'), h('dd', {}, f.recipient_name || '—'),
@@ -45,10 +32,10 @@ function renderResult(link, r) {
       h('dt', {}, 'Awarded'), h('dd', {}, f.date_awarded || '—'),
       f.grade ? [h('dt', {}, 'Grade'), h('dd', {}, f.grade)] : null,
       f.expires ? [h('dt', {}, 'Valid until'), h('dd', {}, f.expires)] : null,
-      h('dt', {}, 'Issuer'), h('dd', {}, f.issuer || '—'),
+      h('dt', {}, 'Issuer'), h('dd', { class: v.issuerVerified ? 'ok' : 'unverified' }, v.issuerLabel),
       h('dt', {}, 'Certificate no.'), h('dd', {}, f.cert_no || '—'),
       r.status === 'valid' ? [h('dt', {}, 'Stamped'), h('dd', {}, fmtTime(r.timestamp) || 'just now (block time pending)'), h('dt', {}, 'Batch size'), h('dd', {}, String(r.batchSize))] : null),
-    r.status === 'valid' ? issuerLine(r) : null,
+    v.issuerNote ? h('p', { class: v.issuerNoteTone }, v.issuerNote) : null,
     r.status === 'valid' && link.pdfHash ? pdfCheck(link.pdfHash) : null,
     h('p', { class: 'small' },
       `Network: ${link.network}${link.network === 'mainnet' ? '' : ' (test network: not real-world proof)'}. `,

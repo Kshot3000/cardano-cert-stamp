@@ -59,19 +59,56 @@ holds each certificate's salt. Without it, lost QR codes can't be reissued.
   with [jsQR](https://github.com/cozmo/jsQR) as fallback), QR photo upload, or
   paste a link. It needs no wallet or account and reads the network from the
   link. If the certificate is bound to a PDF, it can check the file too.
-* **Issuer check:** the page shows whether the wallet that signed the stamp is
-  in our curated `public/issuers.json` registry (empty for now; entries can be
-  `mainnet`, `preprod` or `preview`, and an entry whose address doesn't match
-  its network is ignored). Only spending inputs count as signers: reference
-  and collateral inputs are ignored, so nobody can borrow a school's UTxO to
-  fake "issued by". It also shows whether the signer matches the issuer wallet
-  printed on the certificate.
+* **Issuer check:** see [Who issued it?](#who-issued-it-the-issuer-registry)
+  below. The page only says "Issued by [school]" when the signing wallet is in
+  our curated `public/issuers.json` for that network. Otherwise it leads with
+  "Stamp found, issuer not verified".
 * **Android:** the same static build wrapped with Capacitor (`android/`). The
   verifier and QR scanning work in the app. Stamping needs a desktop browser
   wallet.
 
 Not in the MVP: revocation, NFTs, student wallets, server-side signing, email
 delivery, analytics.
+
+## Who issued it? The issuer registry
+
+**"Valid" means the certificate matches a stamp on Cardano and hasn't been
+edited. On its own, it does not mean we vouch for the school.** Anyone can type
+any school name into the issuer field and stamp it, and anyone can print their
+own wallet address on a certificate. So the verify page shows:
+
+* **✅ Valid certificate · Issued by [school]** only when the wallet that signed
+  the stamp is listed for that school, on that network, in
+  [`public/issuers.json`](public/issuers.json). The name shown comes from the
+  registry, not from the certificate.
+* **☑️ Stamp found, issuer not verified** in every other case. The name typed
+  on the certificate is shown as "(self-declared, not verified)". If the
+  signer differs from the wallet printed on the certificate, the page warns
+  about that too.
+
+Only spending inputs count as the signer. Reference and collateral inputs are
+ignored, so nobody can borrow a school's UTxO to fake "issued by". Entries can
+be `mainnet`, `preprod` or `preview`. An entry whose address doesn't match its
+network is ignored.
+
+### How a school gets added
+
+We add schools ourselves, by hand. There is no on-chain or domain check yet.
+
+1. The school stamps a small test batch from the wallet it will use for real
+   certificates, on the network it wants listed.
+2. We confirm out of band that the school controls that wallet. That means
+   contacting the school through a phone number or website we find
+   independently (not one the requester gives us) and having the school tell
+   us the stamp's transaction hash.
+3. We open a pull request adding `{ "name", "network", "address", "website" }`
+   to `public/issuers.json`. The address must be the signing wallet's payment
+   address (`addr1…` for mainnet, `addr_test1…` for test networks). Once it's
+   reviewed and merged, the next site deploy (and app build) shows the school
+   as verified.
+4. To remove a school, or when it changes wallets, we edit the same file.
+   Already-printed certificates keep verifying as stamps, and they show as
+   "issuer not verified" if the wallet is no longer listed.
 
 ## Chain reads and CORS
 
@@ -147,16 +184,17 @@ and the manifest requests the camera for QR scanning.
 
 ## Testing status
 
-* ✅ 92 unit tests pass, including the official CIP-190 conformance vectors
+* ✅ 99 unit tests pass, including the official CIP-190 conformance vectors
   (canonical CBOR, RFC 9162 roots and inclusion proofs, label-309 chunk
   reassembly; vectors in `test/vectors/`, Apache-2.0, from
   [cardanowall/label-309](https://github.com/cardanowall/label-309)).
 * ✅ The stamp transaction builds offline with Mesh (in Node and in headless
   Chrome) and carries the expected label 309 and 674 metadata. The fee comes
   to about 0.17–0.2 ADA.
-* ✅ The verify page, tested in headless Chrome on a phone-sized screen,
-  accepts a simulated stamped batch, rejects an edited certificate, and
-  decodes an uploaded QR photo. With no Worker configured, it shows "Couldn't
+* ✅ The verify page, tested in headless Chrome on a phone-sized screen, shows
+  a simulated stamp as "Stamp found, issuer not verified". The same stamp shows
+  as "Valid certificate · Issued by …" once the signer is in the registry. It
+  rejects an edited certificate and decodes an uploaded QR photo. With no Worker configured, it shows "Couldn't
   check" for a real Preprod lookup (no relay fallback). Every result shows the
   Cardanoscan link for the right network.
 * ⏳ **Not yet done:** a real stamp on Preprod signed by a real wallet, then a

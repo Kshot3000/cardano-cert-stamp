@@ -32,3 +32,4 @@ footer { margin-top: 24px; text-align: center; } .tip { background: var(--card);
 .pdfcheck { background: #f3f5fa; border-radius: 10px; padding: 10px; margin: 10px 0; }
 .banner.danger { background: #fde8e7; border-color: #f2a7a1; color: #7a1610; }
 .netpick { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; } .netpick label { display: inline-flex; gap: 6px; align-items: center; font-weight: 600; margin: 0; padding: 8px 12px; background: #e7eaf3; border-radius: 10px; }
+dd.unverified { font-weight: 500; color: var(--muted); }

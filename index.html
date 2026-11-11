@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1d3a" />
+  <title>Cert Stamp · Cardano certificate stamping (testnet)</title>
+  <link rel="icon" href="./icon.svg" />
+</head>
+<body>
+  <main id="app" class="home">
+    <header>
+      <img src="./icon.svg" alt="" width="48" height="48" />
+      <h1>Cert Stamp</h1>
+      <p class="lead">Stamp certificates on Cardano. Anyone can scan the QR code and check it's real, even if the issuer's website is gone.</p>
+    </header>
+    <div id="banner"></div>
+    <nav class="cards">
+      <a class="card" href="./verify.html"><h2>Check a certificate</h2><p>Scan the QR code or paste a link. No wallet or account needed.</p></a>
+      <a class="card" href="./issue.html"><h2>Stamp certificates</h2><p>For trainers, schools and contractors. One wallet signature stamps a whole class.</p></a>
+    </nav>
+    <section class="how">
+      <h2>How it works</h2>
+      <ol>
+        <li>Your browser makes a fingerprint (SHA-256 hash) of each certificate, mixed with a secret random salt.</li>
+        <li>All fingerprints in a batch are combined into one Merkle root. That single root goes on Cardano in one transaction (about 0.17 ADA in network fees for the whole batch).</li>
+        <li>Each certificate gets a QR code carrying its details, salt and proof. Scanning it re-checks the fingerprint against the chain.</li>
+      </ol>
+      <p class="small">On-chain format: CIP-190 proof-of-existence record, metadata label 309. Names, grades and emails never go on-chain.</p>
+    </section>
+    <div id="footer"></div>
+  </main>
+  <script type="module" src="./src/home.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+# Cloudflare Worker for the optional read proxy. Deploying needs a Cloudflare
+# account (free tier) and `npx wrangler deploy` run by the account owner.
+# Put keys in secrets, never here:  npx wrangler secret put KOIOS_TOKEN
+name = "cert-stamp-proxy"
+main = "index.js"
+compatibility_date = "2026-11-01"
+
+[vars]
+ALLOWED_ORIGINS = "https://kshot3000.github.io,https://localhost"

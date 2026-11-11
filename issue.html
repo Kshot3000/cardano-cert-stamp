@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1d3a" />
+  <title>Stamp certificates · Cert Stamp</title>
+  <link rel="icon" href="./icon.svg" />
+</head>
+<body>
+  <main id="app">
+    <header class="top"><a href="./index.html" class="back">← Cert Stamp</a><h1>Stamp certificates</h1></header>
+    <div id="banner"></div>
+
+    <section class="panel">
+      <h2>1. Network and wallet</h2>
+      <div class="netpick" role="radiogroup" aria-label="Network">
+        <label><input type="radio" name="network" value="preprod" checked /> Preprod (test)</label>
+        <label><input type="radio" name="network" value="preview" /> Preview (test)</label>
+        <label><input type="radio" name="network" value="mainnet" /> Mainnet (real ADA)</label>
+      </div>
+      <div id="mainnetAck" hidden>
+        <label class="check"><input id="ackMainnet" type="checkbox" /> I understand Mainnet uses real ADA, this software is in testing and unaudited, and my own wallet pays the network fee.</label>
+      </div>
+      <p class="small">Use a Cardano browser wallet (Lace, Eternl, Typhon…) set to the same network. For test networks, get free test ADA from the <a href="https://docs.cardano.org/cardano-testnets/tools/faucet" target="_blank" rel="noopener">testnet faucet</a>. You sign in your own wallet. This app never sees your keys or recovery phrase and never holds funds.</p>
+      <div id="wallets" class="row wrap"></div>
+      <p id="walletStatus" class="small"></p>
+    </section>
+
+    <section class="panel">
+      <h2>2. Issuer</h2>
+      <label>Issuer name (school, trainer or company)<input id="issuer" type="text" maxlength="120" placeholder="Demo Trade School" /></label>
+      <label class="check"><input id="printAddr" type="checkbox" checked /> Print my wallet address on each certificate, so checkers can see who stamped it</label>
+      <label>Batch title (optional, <strong>public on-chain</strong>, no names)<input id="title" type="text" maxlength="64" placeholder="Welding L1 · Nov 2026 cohort" /></label>
+    </section>
+
+    <section class="panel">
+      <h2>3. Certificates</h2>
+      <div class="tabs" role="tablist">
+        <button type="button" role="tab" data-tab="one" aria-selected="true">One certificate</button>
+        <button type="button" role="tab" data-tab="csv" aria-selected="false">Whole class (CSV)</button>
+      </div>
+      <form id="oneForm" data-panel="one">
+        <label>Certificate no.<input name="cert_no" type="text" required maxlength="60" /></label>
+        <label>Recipient name<input name="recipient_name" type="text" required maxlength="120" /></label>
+        <label>Course or qualification<input name="course" type="text" required maxlength="160" /></label>
+        <div class="row">
+          <label>Date awarded<input name="date_awarded" type="date" required /></label>
+          <label>Valid until (optional)<input name="expires" type="date" /></label>
+        </div>
+        <label>Grade (optional)<input name="grade" type="text" maxlength="40" /></label>
+        <label class="upload">Bind to your own PDF (optional): the checker must then present this exact file <input name="pdf" type="file" accept="application/pdf,.pdf" /></label>
+      </form>
+      <div data-panel="csv" hidden>
+        <p class="small">Columns: <code>cert_no, recipient_name, course, date_awarded</code>, optional <code>grade, expires</code>. Dates as YYYY-MM-DD. Other columns (like email) are ignored and never stored. <a id="csvTemplate" href="#">Download a template</a>.</p>
+        <label class="upload">Choose CSV <input id="csvFile" type="file" accept=".csv,text/csv" /></label>
+        <div id="csvPreview"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <h2>4. Stamp</h2>
+      <p class="small">One transaction stamps the whole batch. Network fee is about 0.17–0.2 ADA from your own wallet. 1.5 ADA is sent back to your own address in the same transaction, so you only spend the fee. Stamping itself is free.</p>
+      <button id="stampBtn" type="button" class="big" disabled>Connect a wallet first</button>
+      <p id="stampStatus" aria-live="polite"></p>
+    </section>
+
+    <section id="results" class="panel" hidden></section>
+    <div id="footer"></div>
+  </main>
+  <script type="module" src="./src/issue-page.js"></script>
+</body>
+</html>

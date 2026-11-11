@@ -1,0 +1,4 @@
+{
+  "_comment": "Curated issuer registry. Add a school only after it signs a test stamp from its own wallet and confirms the address with us out of band. Fields: name, network (mainnet|preprod|preview), address (bech32, addr1... for mainnet, addr_test1... for test networks), website (optional). No personal data.",
+  "issuers": []
+}

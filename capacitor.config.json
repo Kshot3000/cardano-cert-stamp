@@ -1,0 +1,9 @@
+{
+  "appId": "io.github.kshot3000.certstamp",
+  "appName": "Cert Stamp",
+  "webDir": "dist",
+  "server": { "androidScheme": "https" },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true }
+  }
+}

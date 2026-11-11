@@ -1,0 +1,43 @@
+{
+  "name": "cardano-cert-stamp",
+  "version": "0.1.0",
+  "description": "Stamp certificates on Cardano (testnet MVP): salted SHA-256 fingerprints, one RFC 9162 Merkle root per batch in a CIP-190 label-309 record, QR verify page.",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:live": "LIVE=1 vitest run test/koios.live.test.js",
+    "android:sync": "npm run build && npx cap sync android",
+    "android:open": "npx cap open android"
+  },
+  "license": "MIT",
+  "type": "module",
+  "devDependencies": {
+    "@capacitor/android": "^8.6.0",
+    "@capacitor/cli": "^8.6.0",
+    "buffer": "^6.0.3",
+    "crypto-browserify": "^3.12.1",
+    "events": "^3.3.0",
+    "process": "^0.11.10",
+    "puppeteer-core": "^25.17.0",
+    "stream-browserify": "^3.0.0",
+    "util": "^0.12.5",
+    "vite": "^8.3.8",
+    "vite-plugin-wasm": "^3.6.0",
+    "vitest": "^5.1.0"
+  },
+  "dependencies": {
+    "@capacitor/core": "^8.6.0",
+    "@meshsdk/core": "^1.9.1",
+    "jspdf": "^4.2.1",
+    "jsqr": "^1.4.0",
+    "jszip": "^3.10.2",
+    "qrcode": "^1.5.4"
+  },
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kshot3000/cardano-cert-stamp.git"
+  }
+}

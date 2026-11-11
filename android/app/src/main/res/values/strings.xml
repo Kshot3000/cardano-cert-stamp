@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Cert Stamp</string>
+    <string name="title_activity_main">Cert Stamp</string>
+    <string name="package_name">io.github.kshot3000.certstamp</string>
+    <string name="custom_url_scheme">io.github.kshot3000.certstamp</string>
+</resources>

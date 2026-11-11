@@ -1,7 +1,9 @@
 // Headless-Chrome check of the built verify page (npm run build && npx vite preview --port 4173).
 //  1. a real Preprod tx with no Worker configured: the browser can't reach Koios (CORS) and
 //     there is no public relay, so it must say "Couldn't check" yet still link Cardanoscan
-//  2. a simulated stamp (Koios response intercepted) -> "Valid", then an edited link -> "Does not match"
+//  2. a simulated stamp (Koios response intercepted) -> "Stamp found, issuer not verified";
+//     the same stamp with the signer in issuers.json -> "Valid certificate · Issued by ...";
+//     an edited link -> "Does not match"
 import puppeteer from 'puppeteer-core';
 import { prepareBatch } from '../src/lib/batch.js';
 import { buildVerifyUrl } from '../src/lib/link.js';
@@ -30,7 +32,9 @@ p.on('pageerror', (x) => errors.push(x.message));
 p.on('console', (m) => process.env.DEBUG && console.log('console:', m.type(), m.text()));
 p.on('requestfailed', (r) => process.env.DEBUG && console.log('failed:', r.url().slice(0, 90), r.failure()?.errorText));
 await p.setRequestInterception(true);
+let registryOn = false;
 p.on('request', (r) => {
+  if (registryOn && r.url().endsWith('/issuers.json')) return void r.respond({ status: 200, contentType: 'application/json', body: JSON.stringify({ issuers: [{ name: 'Demo Trade School (registry)', network: 'preprod', address: ADDR }] }) });
   if (r.url().includes('/tx_info') && r.url().includes(DOWN_TX)) return void r.abort('failed');
   if (process.env.DEBUG && !r.url().startsWith(BASE)) console.log('req:', r.method(), r.url().slice(0, 100));
   if (r.url().includes('/tx_info') && r.url().includes(FAKE_TX)) {
@@ -55,6 +59,9 @@ const r1 = await check(realNonStamp, 'real preprod tx, no Worker');
 const r2 = await check(validUrl, 'simulated stamp');
 await p.screenshot({ path: process.env.SHOT || '/tmp/verify-valid.png', fullPage: true });
 const r3 = await check(editedUrl, 'edited certificate');
+registryOn = true;
+const r6 = await check(validUrl, 'simulated stamp, issuer in registry');
+registryOn = false;
 const r5 = await check(buildVerifyUrl(`${BASE}/verify.html`, { ...link, txHash: DOWN_TX }), 'indexers unreachable');
 // 3. scan path: QR image of the valid link uploaded as a photo -> jsQR -> Valid
 const qrPath = '/tmp/e2e-qr.png';
@@ -66,6 +73,6 @@ await p.waitForFunction(() => document.querySelector('#result h2'), { timeout: 3
 const r4 = await p.$eval('#result', (el) => el.innerText.replace(/\s+/g, ' ').slice(0, 120));
 console.log(`QR photo upload: ${r4}`);
 await b.close();
-const ok = !explorerMissing && r1.includes("Couldn't check right now") && r1.includes('no read proxy') && r2.includes('Valid certificate') && r2.includes('Student 17') && r3.includes('Does not match') && r4.includes('Valid certificate') && r5.includes("Couldn't check right now");
+const ok = !explorerMissing && r1.includes("Couldn't check right now") && r1.includes('no read proxy') && r2.includes('Stamp found, issuer not verified') && !r2.includes('Valid certificate') && r2.includes('self-declared, not verified') && r2.includes('Student 17') && r6.includes('Valid certificate · Issued by Demo Trade School (registry)') && r3.includes('Does not match') && r4.includes('Stamp found, issuer not verified') && r5.includes("Couldn't check right now");
 console.log(ok && !errors.length ? 'E2E VERIFY: PASS' : `E2E VERIFY: FAIL ${errors.join('; ')}`);
 process.exit(ok && !errors.length ? 0 : 1);
